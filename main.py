@@ -15,7 +15,7 @@ def run(): app.run(host='0.0.0.0', port=8080)
 def keep_alive(): Thread(target=run).start()
 
 # --- কনফিগারেশন ---
-API_TOKEN = '8704198760:AAFyHIhV4H88EYMJV323xhR54RcExwEKfj8'
+API_TOKEN = '8704198760:AAGxlMSO0X4cYVyf670_vwJRvPqO955EtUE
 bot = telebot.TeleBot(API_TOKEN)
 MEMORY_FILE = "tse_brain.json"
 
