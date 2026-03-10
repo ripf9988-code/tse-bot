@@ -24,7 +24,7 @@ def keep_alive():
     t.start()
 
 # --- ১. সেটিংস ও কনফিগারেশন ---
-API_TOKEN = '8704198760:AAFyHIhV4H88EYMJV323xhR54RcExwEKfj8'
+API_TOKEN = '8704198760:AAGxlMSO0X4cYVyf670_vwJRvPqO955EtUE'
 BD_TZ = pytz.timezone('Asia/Dhaka')
 bot = telebot.TeleBot(API_TOKEN)
 MEMORY_FILE = "tse_omniscient_core.json"
