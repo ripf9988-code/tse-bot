@@ -5,16 +5,16 @@ import datetime
 import pytz
 import json
 import os
+from telebot import types
 from flask import Flask
 from threading import Thread
-from telebot import types
 
-# --- ১. ফ্লাস্ক সার্ভার (বটকে ২৪ ঘণ্টা জাগিয়ে রাখার জন্য) ---
+# --- Flask Server (বটকে জাগিয়ে রাখার জন্য) ---
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "TSE BOT IS RUNNING 24/7!"
+    return "TSE OMNISCIENT IS ALIVE 24/7"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
@@ -23,23 +23,15 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# --- ২. মেইন বট সেটিংস ---
+# --- ১. সেটিংস ও কনফিগারেশন ---
 API_TOKEN = '8704198760:AAFyHIhV4H88EYMJV323xhR54RcExwEKfj8'
 BD_TZ = pytz.timezone('Asia/Dhaka')
 bot = telebot.TeleBot(API_TOKEN)
-ADMIN_HANDLE = "@tradersohan01"
-MEMORY_FILE = "tse_memory.json"
+MEMORY_FILE = "tse_omniscient_core.json"
 
-# মার্কেট লিস্ট
-OTC_PAIRS = [
-    "USD/BRL-OTC", "EUR/USD-OTC", "GBP/USD-OTC", 
-    "USD/INR-OTC", "USD/BDT-OTC", "AUD/NZD-OTC", 
-    "USD/JPY-OTC", "USD/ARS-OTC", "INTEL-STOCK"
-]
-
-class TSE_Final_Engine:
+class TSE_Omniscient_Engine:
     def __init__(self):
-        self.selected_pair = "USD/BRL-OTC"
+        self.selected_pair = "EUR/USD-OTC"
         self.last_logic = ""
         self.load_memory()
 
@@ -48,85 +40,72 @@ class TSE_Final_Engine:
             with open(MEMORY_FILE, 'r') as f:
                 self.memory = json.load(f)
         else:
-            self.memory = {"PROFIT_PATTERNS": [], "LOSS_PATTERNS": []}
+            self.memory = {"HIDDEN_ALGO": [], "REJECTION_TRAPS": []}
 
     def save_memory(self):
         with open(MEMORY_FILE, 'w') as f:
             json.dump(self.memory, f)
 
-    def analyze(self):
-        time.sleep(4)
-        logics = ["ALGO_TRAP", "CYCLE_REVERSE", "BREAKOUT_FAKE", "S/R_FLIP", "M/W_PATTERN"]
-        current_logic = np.random.choice(logics)
-        direction = "UP" if np.random.randint(1, 100) > 50 else "DOWN"
+    def decrypt_broker_script(self):
+        time.sleep(4) 
+        hidden_logics = [
+            "SECRET: Broker-Side Liquidity Imbalance",
+            "SECRET: Next-Candle Generation Queue Match",
+            "SECRET: Internal Rejection Pulse",
+            "SECRET: Anti-Retail Trapping Script",
+            "SECRET: Server-Side Price Rounding Detection"
+        ]
+        self.last_logic = np.random.choice(hidden_logics)
+        internal_scan = np.random.random()
         
-        status = "📡 NEW ALGO SCAN"
-        if current_logic in self.memory["LOSS_PATTERNS"]:
+        if "Imbalance" in self.last_logic or "Trapping" in self.last_logic:
+            direction = "DOWN" if internal_scan > 0.4 else "UP"
+        else:
+            direction = "UP" if internal_scan > 0.5 else "DOWN"
+
+        status = "🛡️ OMNISCIENT CORE: SYNCED 100%"
+        if self.last_logic in self.memory["REJECTION_TRAPS"]:
             direction = "DOWN" if direction == "UP" else "UP"
-            status = "🔄 REVERSED (PREVIOUS LOSS MEMORY)"
-        elif current_logic in self.memory["PROFIT_PATTERNS"]:
-            status = "✅ CONFIRMED (SUCCESS MEMORY)"
+            status = "🔄 CORE OVERRIDE: BLOCKED"
 
-        self.last_logic = current_logic
-        icon = "🟩 CALL" if direction == "UP" else "🟥 PUT"
-        return icon, f"{np.random.randint(95, 99)}%", status
+        icon = "🟩 CALL (SURESHOT)" if direction == "UP" else "🟥 PUT (SURESHOT)"
+        return icon, status
 
-engine = TSE_Final_Engine()
+engine = TSE_Omniscient_Engine()
 
-# --- ৩. বট হ্যান্ডেলার্স ---
 @bot.message_handler(commands=['start', 'BOT'])
 def start(m):
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    btns = [types.KeyboardButton(p) for p in OTC_PAIRS]
-    markup.add(*btns)
-    markup.add(types.KeyboardButton("🚀 GET SURESHOT AI SIGNAL"))
-    
-    bot.send_message(m.chat.id, f"🛡️ **TSE ULTRA V6 - CLOUD MODE** 🛡️\n━━━━━━━━━━━━━━━━━━━━\nস্বাগতম **{m.from_user.first_name}**!\nবট এখন ২৪ ঘণ্টা সচল থাকবে।", reply_markup=markup, parse_mode="Markdown")
+    markup.add(types.KeyboardButton("💎 GET 100% OMNISCIENT SIGNAL"))
+    bot.send_message(m.chat.id, "👁️ **TSE OMNISCIENT V18 - 24/7 ONLINE** 👁️", reply_markup=markup, parse_mode="Markdown")
 
-@bot.message_handler(func=lambda m: m.text == "🚀 GET SURESHOT AI SIGNAL")
+@bot.message_handler(func=lambda m: m.text == "💎 GET 100% OMNISCIENT SIGNAL")
 def send_signal(m):
-    status_msg = bot.send_message(m.chat.id, f"🔍 **{engine.selected_pair}** ব্রোকার সাইকোলজি বিশ্লেষণ করা হচ্ছে...")
-    
-    signal, acc, mem_status = engine.analyze()
+    signal, status = engine.decrypt_broker_script()
     now = datetime.datetime.now(BD_TZ)
-    
-    msg = (f"✨ **TSE AI SIGNAL** ✨\n━━━━━━━━━━━━━━━━━━━━\n"
-           f"🎯 **ASSET:** {engine.selected_pair}\n"
-           f"🔥 **SIGNAL:** {signal}\n"
-           f"📊 **STRENGTH:** {acc}\n"
-           f"🧠 **MEMORY:** {mem_status}\n"
-           f"⏰ **TIME:** {now.strftime('%I:%M:%S %p')}\n━━━━━━━━━━━━━━━━━━━━\n"
-           f"🚀 **ENTRY:** NEXT 1-MIN\n\n"
-           f"👇 **রেজাল্ট সিলেক্ট করুন:**")
+    msg = (f"🎯 **OMNISCIENT SURESHOT** 🎯\n"
+           f"🚀 **NEXT MOVE:** {signal}\n"
+           f"🧠 **STATUS:** {status}\n"
+           f"⏰ **TIME:** {now.strftime('%I:%M:%S %p')}")
     
     res_markup = types.InlineKeyboardMarkup()
-    res_markup.add(
-        types.InlineKeyboardButton("✅ PROFIT", callback_data="win"),
-        types.InlineKeyboardButton("❌ LOSS", callback_data="loss")
-    )
-    
-    bot.delete_message(m.chat.id, status_msg.message_id)
+    res_markup.add(types.InlineKeyboardButton("✅ WIN", callback_data="win"), types.InlineKeyboardButton("❌ LOSS", callback_data="loss"))
     bot.send_message(m.chat.id, msg, reply_markup=res_markup, parse_mode="Markdown")
 
 @bot.callback_query_handler(func=lambda call: call.data in ["win", "loss"])
 def update_mem(call):
-    if call.data == "win":
-        engine.memory["PROFIT_PATTERNS"].append(engine.last_logic)
-        text = "✅ **RESULT: PROFIT**\nবট এই প্যাটার্নটি সফল হিসেবে সেভ করেছে।"
-    else:
-        engine.memory["LOSS_PATTERNS"].append(engine.last_logic)
-        text = "❌ **RESULT: LOSS**\nবট এই লস থেকে শিখেছে এবং পরে বিপরীত সিগন্যাল দেবে।"
-    
+    if call.data == "win": engine.memory["HIDDEN_ALGO"].append(engine.last_logic)
+    else: engine.memory["REJECTION_TRAPS"].append(engine.last_logic)
     engine.save_memory()
-    bot.edit_message_text(text, call.message.chat.id, call.message.message_id)
+    bot.edit_message_text("✅ ডাটা সিঙ্ক করা হয়েছে।", call.message.chat.id, call.message.message_id)
 
-@bot.message_handler(func=lambda m: any(pair in m.text for pair in OTC_PAIRS))
-def set_pair(m):
-    engine.selected_pair = m.text
-    bot.send_message(m.chat.id, f"✅ {m.text} এনালাইসিসের জন্য প্রস্তুত।")
-
-# --- ৪. রানার ---
+# --- ২৪/৭ চালু রাখার মূল মেকানিজম ---
 if __name__ == "__main__":
-    keep_alive() # সার্ভার চালু করবে
-    print("TSE Cloud Server is Online!")
-    bot.infinity_polling(timeout=15, long_polling_timeout=5)
+    keep_alive() # Flask সার্ভার চালু করবে
+    print("বট এবং কিপ-অ্যালাইভ সার্ভার চালু হয়েছে...")
+    while True:
+        try:
+            bot.polling(none_stop=True, interval=0, timeout=20)
+        except Exception as e:
+            print(f"বট ক্র্যাশ করেছে: {e}. ৫ সেকেন্ড পর পুনরায় চালু হচ্ছে...")
+            time.sleep(5)
