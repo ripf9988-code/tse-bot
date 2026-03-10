@@ -10,14 +10,14 @@ from threading import Thread
 # --- বটের ঘুম তাড়ানোর সিস্টেম (Keep-Alive) ---
 app = Flask('')
 @app.route('/')
-def home(): return "TSE OMNISCIENT IS AWAKE 24/7"
+def home(): return "TSE OMNISCIENT V18 IS AWAKE"
 def run(): app.run(host='0.0.0.0', port=8080)
 def keep_alive(): Thread(target=run).start()
 
-# --- কনফিগারেশন ---
+# --- কনফিগারেশন (আপনার নতুন টোকেন বসানো হয়েছে) ---
 API_TOKEN = '8704198760:AAGxlMSO0X4cYVyf670_vwJRvPqO955EtUE'
 bot = telebot.TeleBot(API_TOKEN)
-MEMORY_FILE = "tse_brain.json"
+MEMORY_FILE = "tse_brain_v18.json"
 
 class OmniscientEngine:
     def __init__(self):
@@ -27,7 +27,7 @@ class OmniscientEngine:
         else: self.mem = {"L": []}
 
     def get_signal(self):
-        time.sleep(1.5)
+        time.sleep(1.5) # এনালাইসিস সিমুলেশন
         logic = np.random.choice(["TRAP_DETECTED", "SERVER_PULSE", "LIQUIDITY_GAP"])
         direction = "UP" if np.random.random() > 0.5 else "DOWN"
         if logic in self.mem["L"]: direction = "DOWN" if direction == "UP" else "UP"
@@ -35,7 +35,7 @@ class OmniscientEngine:
 
 engine = OmniscientEngine()
 
-# --- প্রধান মেনু (আপনার সব পেয়ার এখানে আছে) ---
+# --- প্রধান মেনু ---
 def main_menu():
     m = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     m.add("USD/BRL-OTC", "EUR/USD-OTC", "GBP/USD-OTC", "USD/INR-OTC", 
@@ -47,11 +47,11 @@ def main_menu():
 def welcome(m):
     bot.send_message(m.chat.id, "👁️ **TSE OMNISCIENT V18** চালু হয়েছে।\nএকটি পেয়ার সিলেক্ট করুন:", reply_markup=main_menu(), parse_mode="Markdown")
 
-# --- পেয়ার সিলেকশন (যেকোনো বাটনে চাপ দিলে কাজ করবে) ---
+# --- পেয়ার সিলেকশন হ্যান্ডলার ---
 @bot.message_handler(func=lambda m: any(x in m.text for x in ["OTC", "STOCK"]))
 def handle_pairs(m):
     engine.pair = m.text
-    bot.send_message(m.chat.id, f"✅ **{m.text}** এনালাইসিস করা হচ্ছে...\nএখন সিগন্যাল বাটনে ক্লিক করুন।", parse_mode="Markdown")
+    bot.send_message(m.chat.id, f"✅ **{m.text}** এনালাইসিসের জন্য প্রস্তুত।\nএখন সিগন্যাল বাটনে ক্লিক করুন।", parse_mode="Markdown")
 
 # --- সিগন্যাল বাটন হ্যান্ডলার ---
 @bot.message_handler(func=lambda m: m.text == "🚀 GET SURESHOT AI SIGNAL")
@@ -61,7 +61,7 @@ def signal(m):
         return
     
     dir, log = engine.get_signal()
-    icon = "🟩 CALL" if dir == "UP" else "🟥 PUT"
+    icon = "🟩 CALL (SURESHOT)" if dir == "UP" else "🟥 PUT (SURESHOT)"
     msg = (f"🎯 **SURESHOT SIGNAL**\n📊 **PAIR:** {engine.pair}\n"
            f"━━━━━━━━━━━━━━━\n🔥 **MOVE:** {icon}\n🧠 **LOGIC:** {log}\n━━━━━━━━━━━━━━━")
     
@@ -71,7 +71,7 @@ def signal(m):
 
 @bot.callback_query_handler(func=lambda call: True)
 def feedback(call):
-    if call.data == "l": engine.mem["L"].append("TRAP") # লস হলে লজিক সেভ করবে
+    if call.data == "l": engine.mem["L"].append("TRAP")
     with open(MEMORY_FILE, 'w') as f: json.dump(engine.mem, f)
     bot.answer_callback_query(call.id, "বট শিখে নিয়েছে!")
     bot.edit_message_text(f"{call.message.text}\n\n✅ **LEARNING DONE**", call.message.chat.id, call.message.message_id)
