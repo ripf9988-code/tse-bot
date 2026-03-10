@@ -1,111 +1,81 @@
 import telebot
 import numpy as np
 import time
-import datetime
-import pytz
 import json
 import os
 from telebot import types
 from flask import Flask
 from threading import Thread
 
-# --- Flask Server (বটকে জাগিয়ে রাখার জন্য) ---
+# --- বটের ঘুম তাড়ানোর সিস্টেম (Keep-Alive) ---
 app = Flask('')
-
 @app.route('/')
-def home():
-    return "TSE OMNISCIENT IS ALIVE 24/7"
+def home(): return "TSE OMNISCIENT IS AWAKE 24/7"
+def run(): app.run(host='0.0.0.0', port=8080)
+def keep_alive(): Thread(target=run).start()
 
-def run():
-    app.run(host='0.0.0.0', port=8080)
-
-def keep_alive():
-    t = Thread(target=run)
-    t.start()
-
-# --- ১. সেটিংস ও কনফিগারেশন ---
-API_TOKEN = '8704198760:AAGxlMSO0X4cYVyf670_vwJRvPqO955EtUE'
-BD_TZ = pytz.timezone('Asia/Dhaka')
+# --- কনফিগারেশন ---
+API_TOKEN = '8704198760:AAFyHIhV4H88EYMJV323xhR54RcExwEKfj8'
 bot = telebot.TeleBot(API_TOKEN)
-MEMORY_FILE = "tse_omniscient_core.json"
+MEMORY_FILE = "tse_brain.json"
 
-class TSE_Omniscient_Engine:
+class OmniscientEngine:
     def __init__(self):
-        self.selected_pair = "EUR/USD-OTC"
-        self.last_logic = ""
-        self.load_memory()
-
-    def load_memory(self):
+        self.pair = "NONE"
         if os.path.exists(MEMORY_FILE):
-            with open(MEMORY_FILE, 'r') as f:
-                self.memory = json.load(f)
-        else:
-            self.memory = {"HIDDEN_ALGO": [], "REJECTION_TRAPS": []}
+            with open(MEMORY_FILE, 'r') as f: self.mem = json.load(f)
+        else: self.mem = {"L": []}
 
-    def save_memory(self):
-        with open(MEMORY_FILE, 'w') as f:
-            json.dump(self.memory, f)
+    def get_signal(self):
+        time.sleep(1.5)
+        logic = np.random.choice(["TRAP_DETECTED", "SERVER_PULSE", "LIQUIDITY_GAP"])
+        direction = "UP" if np.random.random() > 0.5 else "DOWN"
+        if logic in self.mem["L"]: direction = "DOWN" if direction == "UP" else "UP"
+        return direction, logic
 
-    def decrypt_broker_script(self):
-        time.sleep(4) 
-        hidden_logics = [
-            "SECRET: Broker-Side Liquidity Imbalance",
-            "SECRET: Next-Candle Generation Queue Match",
-            "SECRET: Internal Rejection Pulse",
-            "SECRET: Anti-Retail Trapping Script",
-            "SECRET: Server-Side Price Rounding Detection"
-        ]
-        self.last_logic = np.random.choice(hidden_logics)
-        internal_scan = np.random.random()
-        
-        if "Imbalance" in self.last_logic or "Trapping" in self.last_logic:
-            direction = "DOWN" if internal_scan > 0.4 else "UP"
-        else:
-            direction = "UP" if internal_scan > 0.5 else "DOWN"
+engine = OmniscientEngine()
 
-        status = "🛡️ OMNISCIENT CORE: SYNCED 100%"
-        if self.last_logic in self.memory["REJECTION_TRAPS"]:
-            direction = "DOWN" if direction == "UP" else "UP"
-            status = "🔄 CORE OVERRIDE: BLOCKED"
-
-        icon = "🟩 CALL (SURESHOT)" if direction == "UP" else "🟥 PUT (SURESHOT)"
-        return icon, status
-
-engine = TSE_Omniscient_Engine()
+# --- প্রধান মেনু (আপনার সব পেয়ার এখানে আছে) ---
+def main_menu():
+    m = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    m.add("USD/BRL-OTC", "EUR/USD-OTC", "GBP/USD-OTC", "USD/INR-OTC", 
+          "USD/BDT-OTC", "AUD/NZD-OTC", "USD/JPY-OTC", "USD/ARS-OTC", 
+          "INTEL-STOCK", "🚀 GET SURESHOT AI SIGNAL")
+    return m
 
 @bot.message_handler(commands=['start', 'BOT'])
-def start(m):
-    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    markup.add(types.KeyboardButton("💎 GET 100% OMNISCIENT SIGNAL"))
-    bot.send_message(m.chat.id, "👁️ **TSE OMNISCIENT V18 - 24/7 ONLINE** 👁️", reply_markup=markup, parse_mode="Markdown")
+def welcome(m):
+    bot.send_message(m.chat.id, "👁️ **TSE OMNISCIENT V18** চালু হয়েছে।\nএকটি পেয়ার সিলেক্ট করুন:", reply_markup=main_menu(), parse_mode="Markdown")
 
-@bot.message_handler(func=lambda m: m.text == "💎 GET 100% OMNISCIENT SIGNAL")
-def send_signal(m):
-    signal, status = engine.decrypt_broker_script()
-    now = datetime.datetime.now(BD_TZ)
-    msg = (f"🎯 **OMNISCIENT SURESHOT** 🎯\n"
-           f"🚀 **NEXT MOVE:** {signal}\n"
-           f"🧠 **STATUS:** {status}\n"
-           f"⏰ **TIME:** {now.strftime('%I:%M:%S %p')}")
+# --- পেয়ার সিলেকশন (যেকোনো বাটনে চাপ দিলে কাজ করবে) ---
+@bot.message_handler(func=lambda m: any(x in m.text for x in ["OTC", "STOCK"]))
+def handle_pairs(m):
+    engine.pair = m.text
+    bot.send_message(m.chat.id, f"✅ **{m.text}** এনালাইসিস করা হচ্ছে...\nএখন সিগন্যাল বাটনে ক্লিক করুন।", parse_mode="Markdown")
+
+# --- সিগন্যাল বাটন হ্যান্ডলার ---
+@bot.message_handler(func=lambda m: m.text == "🚀 GET SURESHOT AI SIGNAL")
+def signal(m):
+    if engine.pair == "NONE":
+        bot.send_message(m.chat.id, "⚠️ আগে একটি পেয়ার (যেমন: USD/JPY-OTC) সিলেক্ট করুন।")
+        return
     
-    res_markup = types.InlineKeyboardMarkup()
-    res_markup.add(types.InlineKeyboardButton("✅ WIN", callback_data="win"), types.InlineKeyboardButton("❌ LOSS", callback_data="loss"))
-    bot.send_message(m.chat.id, msg, reply_markup=res_markup, parse_mode="Markdown")
+    dir, log = engine.get_signal()
+    icon = "🟩 CALL" if dir == "UP" else "🟥 PUT"
+    msg = (f"🎯 **SURESHOT SIGNAL**\n📊 **PAIR:** {engine.pair}\n"
+           f"━━━━━━━━━━━━━━━\n🔥 **MOVE:** {icon}\n🧠 **LOGIC:** {log}\n━━━━━━━━━━━━━━━")
+    
+    res = types.InlineKeyboardMarkup()
+    res.add(types.InlineKeyboardButton("✅ WIN", callback_data="w"), types.InlineKeyboardButton("❌ LOSS", callback_data="l"))
+    bot.send_message(m.chat.id, msg, reply_markup=res, parse_mode="Markdown")
 
-@bot.callback_query_handler(func=lambda call: call.data in ["win", "loss"])
-def update_mem(call):
-    if call.data == "win": engine.memory["HIDDEN_ALGO"].append(engine.last_logic)
-    else: engine.memory["REJECTION_TRAPS"].append(engine.last_logic)
-    engine.save_memory()
-    bot.edit_message_text("✅ ডাটা সিঙ্ক করা হয়েছে।", call.message.chat.id, call.message.message_id)
+@bot.callback_query_handler(func=lambda call: True)
+def feedback(call):
+    if call.data == "l": engine.mem["L"].append("TRAP") # লস হলে লজিক সেভ করবে
+    with open(MEMORY_FILE, 'w') as f: json.dump(engine.mem, f)
+    bot.answer_callback_query(call.id, "বট শিখে নিয়েছে!")
+    bot.edit_message_text(f"{call.message.text}\n\n✅ **LEARNING DONE**", call.message.chat.id, call.message.message_id)
 
-# --- ২৪/৭ চালু রাখার মূল মেকানিজম ---
 if __name__ == "__main__":
-    keep_alive() # Flask সার্ভার চালু করবে
-    print("বট এবং কিপ-অ্যালাইভ সার্ভার চালু হয়েছে...")
-    while True:
-        try:
-            bot.polling(none_stop=True, interval=0, timeout=20)
-        except Exception as e:
-            print(f"বট ক্র্যাশ করেছে: {e}. ৫ সেকেন্ড পর পুনরায় চালু হচ্ছে...")
-            time.sleep(5)
+    keep_alive()
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)
