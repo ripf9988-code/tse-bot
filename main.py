@@ -24,7 +24,7 @@ def keep_alive():
     t.start()
 
 # --- ২. মেইন বট সেটিংস ---
-API_TOKEN = '8372869401:AAGhrEJFmz9BDPIGvTffx3SAbceBerLr6mo'
+API_TOKEN = '8704198760:AAFyHIhV4H88EYMJV323xhR54RcExwEKfj8'
 BD_TZ = pytz.timezone('Asia/Dhaka')
 bot = telebot.TeleBot(API_TOKEN)
 ADMIN_HANDLE = "@tradersohan01"
