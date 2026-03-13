@@ -1,84 +1,111 @@
-import telebot
-import numpy as np
-import time
-import json
-import os
-from telebot import types
-from flask import Flask
-from threading import Thread
-
-# --- বটের ঘুম তাড়ানোর সিস্টেম ---
-app = Flask('')
-@app.route('/')
-def home(): return "TSE OMNISCIENT IS AWAKE"
-def run(): app.run(host='0.0.0.0', port=8080)
-def keep_alive(): Thread(target=run).start()
+import logging
+import asyncio
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
+import yfinance as yf
+from datetime import datetime, timedelta
+import pytz
 
 # --- কনফিগারেশন ---
-API_TOKEN = '8704198760:AAGxlMSO0X4cYVyf670_vwJRvPqO955EtUE'
-bot = telebot.TeleBot(API_TOKEN)
-MEMORY_FILE = "tse_data.json"
+TOKEN = '8704198760:AAE9WUqLFDXRC-yYqg4mz5q_tZa-JwykrQg'
 
-class TradingEngine:
-    def __init__(self):
-        self.selected_pair = "NONE"
-        if os.path.exists(MEMORY_FILE):
-            with open(MEMORY_FILE, 'r') as f: self.memory = json.load(f)
-        else: self.memory = {"L": []}
+# টাইমজোন সেটআপ (বাংলাদেশ সময় অনুযায়ী)
+tz = pytz.timezone('Asia/Dhaka')
 
-    def get_signal(self):
-        time.sleep(1)
-        direction = "UP" if np.random.random() > 0.5 else "DOWN"
-        logic = np.random.choice(["PRICE_ACTION", "TRAP_LEVEL", "LIQUIDITY"])
-        return direction, logic
+def check_market_result(pair, signal_time, direction):
+    try:
+        # পেয়ার নাম কনভার্ট (যেমন: Silver -> XAGUSD=X)
+        ticker_symbol = "XAGUSD=X" if "SILVER" in pair.upper() else f"{pair}=X"
+        ticker = yf.Ticker(ticker_symbol)
+        
+        # ১ মিনিটের ডাটা সংগ্রহ (interval="1m")
+        data = ticker.history(period="1d", interval="1m")
+        
+        if data.empty:
+            return "ERROR"
 
-engine = TradingEngine()
+        # সিগন্যাল টাইম প্রসেসিং
+        now = datetime.now(tz)
+        # ইউজারের দেওয়া সময়কে আজকের তারিখের সাথে যুক্ত করা
+        target_time_obj = datetime.strptime(signal_time, "%H:%M").time()
+        target_dt = tz.localize(datetime.combine(now.date(), target_time_obj))
 
-# --- আপনার কিবোর্ড বাটনগুলো এখানে সাজানো ---
-def get_main_keyboard():
-    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    markup.add("USD/BRL-OTC", "EUR/USD-OTC", "GBP/USD-OTC", "USD/INR-OTC", 
-               "USD/BDT-OTC", "AUD/NZD-OTC", "USD/JPY-OTC", "USD/ARS-OTC", 
-               "INTEL-STOCK", "🚀 GET SURESHOT AI SIGNAL")
-    return markup
+        # সময় এখনও না হলে
+        if target_dt > now:
+            return "PENDING"
 
-@bot.message_handler(commands=['start', 'BOT'])
-def welcome(m):
-    bot.send_message(m.chat.id, "🎯 **TSE OMNISCIENT V18 READY**\nএকটি পেয়ার সিলেক্ট করুন:", 
-                     reply_markup=get_main_keyboard(), parse_mode="Markdown")
+        # ডাটা ইনডেক্সকে লোকাল টাইমজোনে কনভার্ট
+        data.index = data.index.tz_convert(tz)
 
-# --- পেয়ার সিলেক্ট করার লজিক ---
-@bot.message_handler(func=lambda m: any(x in m.text for x in ["OTC", "STOCK"]))
-def set_pair(m):
-    engine.selected_pair = m.text
-    bot.send_message(m.chat.id, f"✅ **{m.text}** এনালাইসিসের জন্য প্রস্তুত।\nএখন সিগন্যাল বাটনে ক্লিক করুন।")
+        def get_candle_color(dt):
+            # ১ মিনিটের উইন্ডো চেক করার জন্য ফ্লোর করা (যাতে সেকেন্ডের পার্থক্য না থাকে)
+            dt_lookup = dt.replace(second=0, microsecond=0)
+            if dt_lookup in data.index:
+                row = data.loc[dt_lookup]
+                # ক্লোজ প্রাইস ওপেন থেকে বেশি হলে গ্রিন, কম হলে রেড
+                return "GREEN" if row['Close'] > row['Open'] else "RED"
+            return None
 
-# --- সিগন্যাল বাটন লজিক (হুবহু বাটনের টেক্সটের সাথে মিলানো) ---
-@bot.message_handler(func=lambda m: "GET SURESHOT AI SIGNAL" in m.text)
-def send_signal(m):
-    if engine.selected_pair == "NONE":
-        bot.send_message(m.chat.id, "⚠️ আগে একটি পেয়ার সিলেক্ট করুন (যেমন: USD/JPY-OTC)")
+        # ডিরেকশন অনুযায়ী প্রত্যাশিত কালার
+        expected_color = "GREEN" if direction.upper() == "CALL" else "RED"
+        
+        # ১. ডিরেক্ট উইন চেক (প্রথম ১ মিনিট)
+        actual_color = get_candle_color(target_dt)
+        if actual_color == expected_color:
+            return "DIRECT_WIN"
+        
+        # ২. MTG চেক (পরবর্তী ১ মিনিট - ১ মিনিটের ক্যান্ডেলের জন্য)
+        mtg_dt = target_dt + timedelta(minutes=1) 
+        
+        # যদি MTG টাইম এখনও না আসে
+        if mtg_dt > now:
+            return "PENDING"
+            
+        mtg_color = get_candle_color(mtg_dt)
+        
+        if mtg_color == expected_color:
+            return "MTG_WIN"
+        else:
+            return "LOSS"
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return "ERROR"
+
+async def process_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text
+    if ';' not in user_text:
         return
-    
-    dir, log = engine.get_signal()
-    move = "🟩 CALL" if dir == "UP" else "🟥 PUT"
-    msg = (f"🎯 **SURESHOT SIGNAL**\n"
-           f"📊 **PAIR:** {engine.selected_pair}\n"
-           f"━━━━━━━━━━━━━━━\n"
-           f"🔥 **MOVE:** {move}\n"
-           f"🧠 **LOGIC:** {log}\n"
-           f"━━━━━━━━━━━━━━━")
-    
-    res = types.InlineKeyboardMarkup()
-    res.add(types.InlineKeyboardButton("✅ WIN", callback_data="w"), 
-            types.InlineKeyboardButton("❌ LOSS", callback_data="l"))
-    bot.send_message(m.chat.id, msg, reply_markup=res, parse_mode="Markdown")
 
-@bot.callback_query_handler(func=lambda call: True)
-def callback(call):
-    bot.answer_callback_query(call.id, "ডাটা সেভ হয়েছে।")
-    bot.edit_message_text(f"{call.message.text}\n\n✅ **SIGNAL UPDATED**", call.message.chat.id, call.message.message_id)
+    await update.message.reply_text("একটু অপেক্ষা করুন, ১ মিনিটের ক্যান্ডেল ডাটা চেক করা হচ্ছে...")
+    
+    lines = user_text.split('\n')
+    result_list = []
+    
+    for line in lines:
+        if ';' in line:
+            parts = [p.strip() for p in line.split(';')]
+            if len(parts) >= 3:
+                pair, time_str, direction = parts[0], parts[1], parts[2]
+                
+                status = check_market_result(pair, time_str, direction)
+                
+                if status == "DIRECT_WIN":
+                    result_list.append(f"{line} ✅ (Direct)")
+                elif status == "MTG_WIN":
+                    result_list.append(f"{line} ✅ (MTG-1)")
+                elif status == "LOSS":
+                    result_list.append(f"{line} ❌ (Loss)")
+                elif status == "PENDING":
+                    result_list.append(f"{line} 👀 (Wait)")
+                else:
+                    result_list.append(f"{line} ⚠️ (Error/No Data)")
 
-if __name__ == "__main__":
-    keep_alive()
-    bot.infinity_polling()
+    final_message = "\n".join(result_list)
+    await update.message.reply_text(f"📊 ফলাফল (১ মিনিট ক্যান্ডেল):\n\n{final_message}")
+
+if __name__ == '__main__':
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), process_list))
+    print("1-Min Result Checker Bot is running...")
+    app.run_polling()
