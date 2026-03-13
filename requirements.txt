@@ -1,4 +1,6 @@
 python-telegram-bot
 yfinance
-pandas
+numpy
 pytz
+flask
+gunicorn
